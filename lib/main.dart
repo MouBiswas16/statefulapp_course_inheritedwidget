@@ -1,6 +1,7 @@
 // ignore_for_file: prefer_const_constructors
 
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 
 void main() {
   runApp(const MyApp());
@@ -9,13 +10,39 @@ void main() {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Flutter Demo',
-      home: const HomePage(),
+      home: ApiProvider(
+        api: Api(),
+        child: HomePage(),
+      ),
     );
+  }
+}
+
+class ApiProvider extends InheritedWidget {
+  final Api api;
+  final String uuid;
+
+  ApiProvider({
+    Key? key,
+    required this.api,
+    required Widget child,
+  })  : uuid = const Uuid().v4(),
+        super(
+          key: key,
+          child: child,
+        );
+
+  @override
+  bool updateShouldNotify(covariant ApiProvider oldWidget) {
+    return uuid != oldWidget.uuid;
+  }
+
+  static ApiProvider of(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<ApiProvider>()!;
   }
 }
 
@@ -27,7 +54,8 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  String title = "Tap the screen";
+  ValueKey _textkey = const ValueKey<String?>(null);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -35,22 +63,53 @@ class _HomePageState extends State<HomePage> {
         centerTitle: true,
         backgroundColor: Colors.blue,
         title: Text(
-          title,
+          ApiProvider.of(context).api.dateAndTime ?? "empty",
           style: TextStyle(
             color: Colors.white,
           ),
         ),
       ),
       body: GestureDetector(
-        onTap: () {
+        onTap: () async {
+          final api = ApiProvider.of(context).api;
+          final dateAndTime = await api.getDateAndTime();
           setState(() {
-            title = DateTime.now().toIso8601String();
+            _textkey = ValueKey(dateAndTime);
           });
         },
-        child: Container(
-          color: Colors.grey,
+        child: SizedBox.expand(
+          child: Container(
+            color: Colors.grey.shade300,
+            child: DateTimeWidget(
+              key: _textkey,
+            ),
+          ),
         ),
       ),
     );
+  }
+}
+
+class DateTimeWidget extends StatelessWidget {
+  const DateTimeWidget({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final api = ApiProvider.of(context).api;
+    return Text(api.dateAndTime ?? "Tap on screen to fetch date and time.");
+  }
+}
+
+class Api {
+  String? dateAndTime;
+
+  Future<String> getDateAndTime() {
+    return Future.delayed(
+      Duration(seconds: 1),
+      () => DateTime.now().toIso8601String(),
+    ).then((value) {
+      dateAndTime = value;
+      return value;
+    });
   }
 }
